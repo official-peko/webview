@@ -1,0 +1,10 @@
+{
+    "description": "Library for creating and managing a crossplatform webview",
+    "contributor": {
+        "organization": "Peko"
+    },
+    "versions": [
+        "v0.0.1"
+    ],
+    "dependencies": []
+}

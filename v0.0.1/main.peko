@@ -1,0 +1,207 @@
+//! This file implements a crossplatform webview for Peko.
+//  ________  _______   ___  __    ________
+// |\   __  \|\  ___ \ |\  \|\  \ |\   __  \
+// \ \  \|\  \ \   __/|\ \  \/  /|\ \  \|\  \
+//  \ \   ____\ \  \_|/_\ \   ___  \ \  \\\  \
+//   \ \  \___|\ \  \_|\ \ \  \\ \  \ \  \\\  \
+//    \ \__\    \ \_______\ \__\\ \__\ \_______\
+//     \|__|     \|_______|\|__| \|__|\|_______|
+//
+// Copyright 2025 Preston Brown. All Rights Reserved.
+
+import threads;
+
+// Implement the Android webview
+platform android {
+    link objects::android::android_webview as object;
+    link objects::android::native_glue as object;
+    link objects::android::android_usb_devices as object;
+
+    [external] fn MainWVSetURL(url: string);
+    [external] fn CreateMainWV(appname: string);
+
+    /// A native WebView for rendering HTML.
+    class WebView {
+        [private] title: string;
+        [private] url: string;
+        
+        /// Creates a new webview with the provided title and dimensions.
+        constructor(title: String, width: int, height: int) {
+            this.title = title;
+            this.url = "about:blank";
+        }
+
+        /// Sets the title of the WebView.
+        /// Can only be called before running the webview.
+        [mutator] fn set_title(new_title: string) {
+            this.title = new_title;
+        }
+
+        /// Navigates the webview to the provided url.
+        [mutator] fn navigate(url: string) {
+            this.url = url;
+            
+            threads::new_thread(closure[url]() {
+                extern::MainWVSetURL(url);
+            });
+        }
+
+        /// Runs the webview.
+        fn run() {
+            extern::CreateMainWV(this.title);
+        }
+    }
+}
+
+// Implement the IOS webview
+platform ios {
+    arch x86_64 {
+        link objects::ios::x86_64::webview as object;
+    }
+
+    arch arm {
+        link objects::ios::arm::webview as object;
+    }
+
+    [external] fn createWebview(url: string) => int;
+
+    /// A native WebView for rendering HTML.
+    class WebView {
+        [private] url: String;
+        
+        /// Creates a new webview with the provided url and dimensions.
+        constructor(url: String, width: int, height: int) {
+            this.url = url
+        }
+        
+        [mutator] fn set_title(new_title: string) {}
+
+        /// Runs the webview.
+        fn run() {
+            extern::createWebview(this.url)
+        }
+
+        /// Navigates the webview to the provided URL.
+        /// Only applicable before running the webview.
+        fn navigate(url: String) {
+            this.url = url;
+        }
+    }
+}
+
+platform windows {
+    link objects::windows::webview as object;
+}
+
+platform linux {
+    arch x86_64 {
+        link objects::linux::x86_64::webview as object;
+    }
+
+    arch arm {
+        link objects::linux::arm::webview as object;
+    }
+}
+
+platform macos {
+    arch x86_64 {
+        link objects::macos::x86_64::webview as object;
+    }
+
+    arch arm {
+        link objects::macos::arm::webview as object;
+    }
+}
+
+// Implement the Desktop webview
+platform windows|linux|macos {
+    [external] fn webview_create(debug: int, window: opaque) => opaque;
+    [external] fn webview_destroy(w: opaque);
+    [external] fn webview_run(w: opaque);
+    [external] fn webview_set_title(w: opaque, title: string);
+    [external] fn webview_set_size(w: opaque, width: int, height: int, hints: int);
+    [external] fn webview_navigate(w: opaque, url: string);
+    [external] fn webview_set_html(w: opaque, html: string);
+
+    
+    [private] fn WEBVIEW_HINT_NONE() => int64 {
+        return 0;
+    }
+
+    [private] fn WEBVIEW_HINT_MIN() => int {
+        return 1;
+    }
+
+    [private] fn WEBVIEW_HINT_MAX() => int {
+        return 2;
+    }
+
+    [private] fn WEBVIEW_HINT_FIXED() => int {
+        return 3;
+    }
+
+    /// A native WebView for rendering HTML.
+    class WebView {
+        [private] title: String;
+        [private] width: int;
+        [private] height: int;
+        [private] view_window: opaque;
+        [private] url: String;
+
+        /// Creates a new webview with the provided title and dimensions.
+        constructor(title: String, width: int, height: int) {
+            this.view_window = extern::webview_create(0, null);
+            this.title = title;
+            this.width = width;
+            this.height = height;
+
+            this.url = "";
+
+            extern::webview_set_title(this.view_window, title);
+            extern::webview_set_size(this.view_window, width, height, WEBVIEW_HINT_NONE());
+        }
+
+        /// Creates a new webview with the provided title, url, and dimensions.
+        constructor(title: String, width: int, height: int, url: String) {
+            this.view_window = extern::webview_create(0, null);
+            this.title = title;
+            this.width = width;
+            this.height = height;
+            this.url = url;
+
+            extern::webview_navigate(this.view_window, url);
+            extern::webview_set_title(this.view_window, title);
+            extern::webview_set_size(this.view_window, width, height, WEBVIEW_HINT_NONE());
+        }
+
+        /// Sets the dimensions of the WebView.
+        [mutator] fn set_size(width: int, height: int) {
+            this.width = width;
+            this.height = height;
+            extern::webview_set_size(this.view_window, width, height, WEBVIEW_HINT_NONE());
+        }
+
+        /// Sets the title of the WebView.
+        [mutator] fn set_title(new_title: string) {
+            this.title = new_title;
+            extern::webview_set_title(this.view_window, title);
+        }
+
+        /// Navigates the WebView to the provided URL.
+        [mutator] fn navigate(url: String) {
+            this.url = url;
+            extern::webview_navigate(this.view_window, url);
+        }
+
+        /// Sets the HTML for the WebView to render.
+        [mutator] fn set_html(html: String) {
+            extern::webview_set_html(this.view_window, html);
+        }
+
+        /// Runs the WebView; blocking.
+        fn run() {
+            extern::webview_run(this.view_window);
+            extern::webview_destroy(this.view_window);
+        }
+    }
+}
