@@ -9,7 +9,7 @@
 //
 // Copyright 2025 Preston Brown. All Rights Reserved.
 
-import threads;
+import threads@"v0.0.1";
 
 // Implement the Android webview
 platform android {
