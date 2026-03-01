@@ -7,6 +7,6 @@
         "v0.0.1"
     ],
     "dependencies": {
-        "threads": "v0.0.1"
+        "threads": ["v0.0.1"]
     }
 }
